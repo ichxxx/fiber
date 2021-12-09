@@ -868,6 +868,30 @@ func Test_App_Group_Invalid(t *testing.T) {
 	New().Group("/").Use(1)
 }
 
+// go test -run Test_App_Group_ErrorHandler
+func Test_App_Group_ErrorHandler(t *testing.T) {
+	micro := New(Config{
+		ErrorHandler: func(c *Ctx, err error) error {
+			return c.Status(StatusInternalServerError).SendString("group err: " + err.Error())
+		},
+	})
+	micro.Get("/doe", func(c *Ctx) error {
+		return errors.New("some err")
+	})
+
+	app := New()
+	v1 := app.Group("/v1")
+	v1.Mount("/john", micro)
+
+	resp, err := app.Test(httptest.NewRequest(MethodGet, "/v1/john/doe", nil))
+	utils.AssertEqual(t, nil, err, "app.Test(req)")
+	utils.AssertEqual(t, StatusInternalServerError, resp.StatusCode, "Status code")
+
+	body, err := ioutil.ReadAll(resp.Body)
+	utils.AssertEqual(t, nil, err)
+	utils.AssertEqual(t, "group err: some err", string(body))
+}
+
 // go test -run Test_App_Group_Mount
 func Test_App_Group_Mount(t *testing.T) {
 	micro := New()
